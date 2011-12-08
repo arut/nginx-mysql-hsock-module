@@ -1,0 +1,25 @@
+--------------------------------
+NGINX MySQL Handlersocket module
+--------------------------------
+
+Provides MySQL InnoDB access via Handlersocket protocol
+
+Implemented as non-blocking upstream module
+
+(c) 2011 Roman Arutyunyan, arut@qip.ru
+
+
+
+Build:
+======
+
+Add this when configuring NGNIX:
+
+./configure --add-module=$PATH_TO_MODULE
+
+
+
+
+Examples:
+=========
+
