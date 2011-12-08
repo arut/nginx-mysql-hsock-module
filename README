@@ -20,6 +20,105 @@ Add this when configuring NGNIX:
 
 
 
-Examples:
+Usage:
 =========
 
+Suppose you have an InnoDB table in database "mydbname" named "mytable"
+with 4 fields (of any type):
+
+  * "key" (this is primary key field as the name says :) )
+  * "field1"
+  * "field2"
+  * "field3"
+
+These are settings you should add to nginx.conf file
+to work with the table directly from NGINX.
+
+# first create upstreams (read & write) with keepalive enabled
+
+upstream hsock_rsrv {
+	server 127.0.0.1:9998;
+	keepalive 1024;
+}
+
+upstream hsock_wsrv {
+	server 127.0.0.1:9999;
+	keepalive 1024;
+}
+
+# then create operation locations within server block.
+# 4 operations are supported: select, update, insert, delete
+# Note there should be different upstreams for each of them
+# (the module performs index initialization based on particular 
+# location data)
+
+location ~ /select.* {
+
+	hsock_pass   hsock_rsrv;
+	hsock_db     mydbname;
+	hsock_table  mytable;
+
+	# Yes, you should copy variables like this
+	# if you need to use arg_, http_ etc variables.
+	# They are not accessed directly so far.
+
+	set $key $arg_key; 
+
+	hsock_select field1 field2 field3;
+	hsock_key    $key;
+}
+
+location ~ /insert.* {
+
+	hsock_pass   hsock_wsrv;
+	hsock_db     mydbname;
+	hsock_table  mytable;
+
+	set $key $arg_key;
+	set $field1 $arg_field1;
+	set $field2 $arg_field2;
+	set $field3 $arg_field3;
+
+	hsock_insert key $key
+		field1 $field1
+		field2 $field2
+		field3 $field3;
+}
+
+location ~ /update.* {
+
+	hsock_pass   hsock_wsrv;
+	hsock_db     mydbname;
+	hsock_table  mytable;
+
+	set $key $arg_key;
+	set $field1 $arg_field1;
+	set $field2 $arg_field2;
+	set $field3 $arg_field3;
+
+	hsock_update
+		field1 $field1
+		field2 $field2
+		field3 $field3;
+
+	hsock_key $key;
+}
+
+location ~ /delete.* {
+
+	hsock_pass   hsock_wsrv;
+	hsock_db     mydbname;
+	hsock_table  mytable;
+
+	set $key $arg_key;
+
+	hsock_delete;
+	hsock_key $key;
+}
+
+
+Data is returned line-by-line
+1 line - errorcode (0=OK, >0=error)
+2 line - number of data lines
+3 ...  - data lines; data fields are returned on a field-per-line basis. 
+         Multiple rows are returned the same way as a single row.
