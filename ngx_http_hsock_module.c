@@ -145,7 +145,7 @@ static ngx_command_t ngx_http_hsock_commands[] = {
 		offsetof(ngx_http_hsock_loc_conf_t, db),
 		NULL },
 
-	{	ngx_string("hsock_table"), /* aliases: hsock_from, hsock_into */
+	{	ngx_string("hsock_table"),
 		NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
 		ngx_conf_set_str_slot,
 		NGX_HTTP_LOC_CONF_OFFSET,
@@ -330,8 +330,8 @@ static ngx_int_t ngx_http_hsock_create_request(ngx_http_request_t *r)
 	   In this handler we cannot check u->peer.cached
 	   and find out if the connection should be
 	   initialized with open_index call.
-       Additional reply fields from this request 
-       are read by process_header handler.
+	   Additional reply fields from this request 
+	   are read by process_header handler.
 	*/
 
 	u->request_sent = 1;
@@ -686,10 +686,7 @@ static char* ngx_http_hsock_set_op(ngx_conf_t *cf, int op, void* conf)
 
 	/* mixed commands ? */
 	if (hlcf->op != NGX_CONF_UNSET) 
-	{
-		ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock mixed commands within single location");
-		return NGX_CONF_ERROR;
-	}
+		return "resets operation";
 
 	hlcf->op = op;
 
@@ -701,11 +698,12 @@ static char* ngx_http_hsock_select(ngx_conf_t *cf, ngx_command_t *cmd, void *con
 	ngx_str_t *value = cf->args->elts;
 	ngx_http_hsock_loc_conf_t* hlcf = conf;
 	unsigned n;
+	char* s;
 
 	ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock select command handler");
 
-	if (ngx_http_hsock_set_op(cf, NGX_HTTP_HSOCK_SELECT, conf) != NGX_CONF_OK)
-		return NGX_CONF_ERROR;
+	if ((s = ngx_http_hsock_set_op(cf, NGX_HTTP_HSOCK_SELECT, conf)) != NGX_CONF_OK)
+		return s;
 
 	/* init array */
 	if (!hlcf->columns.nalloc && cf->args->nelts > 1)
@@ -713,12 +711,8 @@ static char* ngx_http_hsock_select(ngx_conf_t *cf, ngx_command_t *cmd, void *con
 
 	for(n = 1; n < cf->args->nelts; ++n) {
 
-		if (value[n].data[0] == '$') {
-			ngx_log_debug(NGX_LOG_INFO, cf->log, 0, 
-				"hsock variables are not supported in select: '%*s'", 
-				value[n].len, value[n].data);
-			return NGX_CONF_ERROR;
-		}
+		if (value[n].data[0] == '$')
+			return "contains variables as column names";
 
 		*((ngx_str_t*)ngx_array_push(&hlcf->columns)) = value[n];
 	}
@@ -735,7 +729,7 @@ static char* ngx_http_hsock_set_columns(ngx_conf_t *cf, void *conf)
 	ngx_http_hsock_value_t* cvalue;
 
 	if ((cf->args->nelts & 1) != 1) /* odd ? (remember +1 command name */
-		return "hsock odd number of arguments";
+		return "has odd number of arguments";
 
 	/* init arrays */
 	if (cf->args->nelts > 1) {
@@ -751,12 +745,8 @@ static char* ngx_http_hsock_set_columns(ngx_conf_t *cf, void *conf)
 
 	for(n = 1; n < cf->args->nelts; ++n) {
 
-		if (value[n].data[0] == '$') {
-			ngx_log_debug(NGX_LOG_INFO, cf->log, 0, 
-				"hsock variables are not supported as column name: '%*s'", 
-				value[n].len, value[n].data);
-			return "hsock variables are not supported as column name";
-		}
+		if (value[n].data[0] == '$')
+			return "contains variables as column names";
 
 		*((ngx_str_t*)ngx_array_push(&hlcf->columns)) = value[n];
 
@@ -779,30 +769,36 @@ static char* ngx_http_hsock_set_columns(ngx_conf_t *cf, void *conf)
 
 static char* ngx_http_hsock_update(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
+	char *s;
+
 	ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock update command handler");
 
-	if (ngx_http_hsock_set_op(cf, NGX_HTTP_HSOCK_UPDATE, conf) != NGX_CONF_OK)
-		return NGX_CONF_ERROR;
+	if ((s = ngx_http_hsock_set_op(cf, NGX_HTTP_HSOCK_UPDATE, conf)) != NGX_CONF_OK)
+		return s;
 
 	return ngx_http_hsock_set_columns(cf, conf);
 }
 
 static char* ngx_http_hsock_insert(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
+	char *s;
+
 	ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock insert command handler");
 
-	if (ngx_http_hsock_set_op(cf, NGX_HTTP_HSOCK_INSERT, conf) != NGX_CONF_OK)
-		return NGX_CONF_ERROR;
+	if ((s = ngx_http_hsock_set_op(cf, NGX_HTTP_HSOCK_INSERT, conf)) != NGX_CONF_OK)
+		return s;
 
 	return ngx_http_hsock_set_columns(cf, conf);
 }
 
 static char* ngx_http_hsock_delete(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
+	char *s;
+
 	ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock delete command handler");
 
-	if (ngx_http_hsock_set_op(cf, NGX_HTTP_HSOCK_DELETE, conf) != NGX_CONF_OK)
-		return NGX_CONF_ERROR;
+	if ((s = ngx_http_hsock_set_op(cf, NGX_HTTP_HSOCK_DELETE, conf)) != NGX_CONF_OK)
+		return s;
 
 	return NGX_CONF_OK;
 }
