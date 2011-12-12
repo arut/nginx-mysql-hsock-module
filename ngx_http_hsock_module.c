@@ -80,7 +80,15 @@ struct ngx_http_hsock_loc_conf_s {
 
 	ngx_array_t values;  /* array of ngx_hsock_value_t */
 
-	ngx_int_t op;
+	ngx_int_t act;
+
+	ngx_str_t op;        /* = > < >= <= */
+
+	ngx_str_t mop;       /* U + - U? +? -? */
+
+	ngx_int_t limit;
+
+	ngx_int_t offset;
 };
 
 typedef struct ngx_http_hsock_loc_conf_s ngx_http_hsock_loc_conf_t;
@@ -103,35 +111,35 @@ typedef struct ngx_http_hsock_ctx_s ngx_http_hsock_ctx_t;
 
 static ngx_command_t ngx_http_hsock_commands[] = {
 
-	{ ngx_string("hsock_pass"),
+	{	ngx_string("hsock_pass"),
 		NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF|NGX_CONF_TAKE1,
 		ngx_http_hsock_pass,
 		NGX_HTTP_LOC_CONF_OFFSET,
 		0,
 		NULL },
 
-	{ ngx_string("hsock_connect_timeout"),
+	{	ngx_string("hsock_connect_timeout"),
 		NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
 		ngx_conf_set_msec_slot,
 		NGX_HTTP_LOC_CONF_OFFSET,
 		offsetof(ngx_http_hsock_loc_conf_t, upstream.connect_timeout),
 		NULL },
 
-	{ ngx_string("hsock_send_timeout"),
+	{	ngx_string("hsock_send_timeout"),
 		NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
 		ngx_conf_set_msec_slot,
 		NGX_HTTP_LOC_CONF_OFFSET,
 		offsetof(ngx_http_hsock_loc_conf_t, upstream.send_timeout),
 		NULL },
 
-	{ ngx_string("hsock_buffer_size"),
+	{	ngx_string("hsock_buffer_size"),
 		NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
 		ngx_conf_set_size_slot,
 		NGX_HTTP_LOC_CONF_OFFSET,
 		offsetof(ngx_http_hsock_loc_conf_t, upstream.buffer_size),
 		NULL },
 
-	{ ngx_string("hsock_read_timeout"),
+	{	ngx_string("hsock_read_timeout"),
 		NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
 		ngx_conf_set_msec_slot,
 		NGX_HTTP_LOC_CONF_OFFSET,
@@ -194,6 +202,34 @@ static ngx_command_t ngx_http_hsock_commands[] = {
 		0,
 		NULL },
 
+	{	ngx_string("hsock_op"),
+		NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+		ngx_conf_set_str_slot,
+		NGX_HTTP_LOC_CONF_OFFSET,
+		offsetof(ngx_http_hsock_loc_conf_t, op),
+		NULL },
+
+	{	ngx_string("hsock_mop"),
+		NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+		ngx_conf_set_str_slot,
+		NGX_HTTP_LOC_CONF_OFFSET,
+		offsetof(ngx_http_hsock_loc_conf_t, mop),
+		NULL },
+
+	{	ngx_string("hsock_limit"),
+		NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+		ngx_conf_set_num_slot,
+		NGX_HTTP_LOC_CONF_OFFSET,
+		offsetof(ngx_http_hsock_loc_conf_t, limit),
+		NULL },
+
+	{	ngx_string("hsock_offset"),
+		NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+		ngx_conf_set_num_slot,
+		NGX_HTTP_LOC_CONF_OFFSET,
+		offsetof(ngx_http_hsock_loc_conf_t, offset),
+		NULL },
+
 	ngx_null_command
 };
 
@@ -234,6 +270,9 @@ static ngx_int_t ngx_http_hsock_append_data(ngx_http_request_t *r,
 {
 	ngx_chain_t *cl = *ll;
 	ngx_buf_t *b = cl->buf;
+
+	if (!len)
+		return NGX_OK;
 
 	/* TODO: split data on buffer overflow */
 	if (b->end - b->last < (int)len) {
@@ -322,6 +361,9 @@ static ngx_int_t ngx_http_hsock_create_request(ngx_http_request_t *r)
 	ngx_chain_t *cl, **ll = &cl;
 	ngx_http_hsock_ctx_t *ctx;
 	ngx_http_upstream_t  *u;
+	ngx_str_t op, mop;
+	u_char lim[32];
+	ngx_str_t slim;
 
 	u = r->upstream;
 
@@ -351,23 +393,50 @@ static ngx_int_t ngx_http_hsock_create_request(ngx_http_request_t *r)
 
 	u->request_bufs = cl;
 
+	op = hlcf->op;
+
+	if (!op.len) {
+		ngx_str_set(&op, "=");
+	}
+
+	mop = hlcf->mop;
+
+	if (!mop.len) {
+		ngx_str_set(&mop, "U");
+	}
+
+	slim.len = 0;
+
+	if (hlcf->limit != NGX_CONF_UNSET
+			|| hlcf->offset != NGX_CONF_UNSET)
+	{
+		slim.data = lim;
+		slim.len = ngx_snprintf(lim, sizeof(lim), "\t%d\t%d\t", 
+				hlcf->limit == NGX_CONF_UNSET ? 1 : hlcf->limit, 
+				hlcf->offset == NGX_CONF_UNSET ? 0 : hlcf->offset) - slim.data;
+	}
+
 	/* append request */
-	switch(hlcf->op) {
+	switch(hlcf->act) {
 
 		case NGX_HTTP_HSOCK_SELECT:
-			b->last = ngx_slprintf(b->last, b->end, "0\t=\t%d\t", hlcf->where.nelts);
+			b->last = ngx_slprintf(b->last, b->end, "0\t%V\t%d\t", &op, hlcf->where.nelts);
 			if (b->last == b->end)
 				return NGX_ERROR;
 			ngx_http_hsock_append_value_list(r, ll, &hlcf->where);
+			ngx_http_hsock_append_data(r, ll, slim.data, slim.len);
 			ngx_http_hsock_append_data(r, ll, (u_char*)"\n", 1);
 			break;
 
 		case NGX_HTTP_HSOCK_UPDATE:
-			b->last = ngx_slprintf(b->last, b->end, "0\t=\t%d\t", hlcf->where.nelts);
+			b->last = ngx_slprintf(b->last, b->end, "0\t%V\t%d\t", &op, hlcf->where.nelts);
 			if (b->last == b->end)
 				return NGX_ERROR;
 			ngx_http_hsock_append_value_list(r, ll, &hlcf->where);
-			ngx_http_hsock_append_data(r, ll, (u_char*)"\t1\t0\tU\t", 7);
+			ngx_http_hsock_append_data(r, ll, slim.data, slim.len);
+			ngx_http_hsock_append_data(r, ll, (u_char*)"\t1\t0\t", 5);
+			ngx_http_hsock_append_data(r, ll, mop.data, mop.len);
+			ngx_http_hsock_append_data(r, ll, (u_char*)"\t", 1);
 			ngx_http_hsock_append_value_list(r, ll, &hlcf->values);
 			ngx_http_hsock_append_data(r, ll, (u_char*)"\n", 1);
 			break;
@@ -381,7 +450,7 @@ static ngx_int_t ngx_http_hsock_create_request(ngx_http_request_t *r)
 			break;
 
 		case NGX_HTTP_HSOCK_DELETE:
-			b->last = ngx_slprintf(b->last, b->end, "0\t=\t%d\t", hlcf->where.nelts);
+			b->last = ngx_slprintf(b->last, b->end, "0\t%V\t%d\t", &op, hlcf->where.nelts);
 			if (b->last == b->end)
 				return NGX_ERROR;
 			ngx_http_hsock_append_value_list(r, ll, &hlcf->where);
@@ -573,7 +642,7 @@ static ngx_int_t ngx_http_hsock_handler(ngx_http_request_t *r)
 
 	hlcf = ngx_http_get_module_loc_conf(r, ngx_http_hsock_module);
 
-	if (hlcf->op == NGX_CONF_UNSET)
+	if (hlcf->act == NGX_CONF_UNSET)
 		return NGX_DECLINED;
 
 	/* create upstream */
@@ -632,7 +701,10 @@ static void* ngx_http_hsock_create_loc_conf(ngx_conf_t *cf)
 	conf->upstream.read_timeout = NGX_CONF_UNSET_MSEC;
 	conf->upstream.buffer_size = NGX_CONF_UNSET_SIZE;
 
-	conf->op = NGX_CONF_UNSET;
+	conf->act = NGX_CONF_UNSET;
+
+	conf->limit = NGX_CONF_UNSET;
+	conf->offset = NGX_CONF_UNSET;
 
 	return conf;
 }
@@ -661,7 +733,11 @@ static char* ngx_http_hsock_merge_loc_conf(ngx_conf_t *cf, void *parent, void *c
 	ngx_conf_merge_str_value(conf->db, prev->db, "");
 	ngx_conf_merge_str_value(conf->index, prev->index, "");
 	ngx_conf_merge_str_value(conf->table, prev->table, "");
-	ngx_conf_merge_value(conf->op, prev->op, NGX_CONF_UNSET);
+	ngx_conf_merge_value(conf->act, prev->act, NGX_CONF_UNSET);
+	ngx_conf_merge_str_value(conf->op, prev->op, "");
+	ngx_conf_merge_str_value(conf->mop, prev->mop, "");
+	ngx_conf_merge_value(conf->limit, prev->limit, NGX_CONF_UNSET);
+	ngx_conf_merge_value(conf->offset, prev->offset, NGX_CONF_UNSET);
 
 #define NGX_HTTP_HSOCK_MERGE_ARRAY(name) \
 	if (prev->name.nelts && !conf->name.nelts) \
@@ -676,19 +752,19 @@ static char* ngx_http_hsock_merge_loc_conf(ngx_conf_t *cf, void *parent, void *c
 	return NGX_CONF_OK;
 }
 
-static char* ngx_http_hsock_set_op(ngx_conf_t *cf, int op, void* conf) 
+static char* ngx_http_hsock_set_act(ngx_conf_t *cf, int act, void* conf) 
 {
 	ngx_http_hsock_loc_conf_t *hlcf = conf;
 
 	/* already set ? */
-	if (hlcf->op == op)
+	if (hlcf->act == act)
 		return NGX_CONF_OK;
 
 	/* mixed commands ? */
-	if (hlcf->op != NGX_CONF_UNSET) 
+	if (hlcf->act != NGX_CONF_UNSET) 
 		return "resets operation";
 
-	hlcf->op = op;
+	hlcf->act = act;
 
 	return NGX_CONF_OK;
 }
@@ -702,7 +778,7 @@ static char* ngx_http_hsock_select(ngx_conf_t *cf, ngx_command_t *cmd, void *con
 
 	ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock select command handler");
 
-	if ((s = ngx_http_hsock_set_op(cf, NGX_HTTP_HSOCK_SELECT, conf)) != NGX_CONF_OK)
+	if ((s = ngx_http_hsock_set_act(cf, NGX_HTTP_HSOCK_SELECT, conf)) != NGX_CONF_OK)
 		return s;
 
 	/* init array */
@@ -773,7 +849,7 @@ static char* ngx_http_hsock_update(ngx_conf_t *cf, ngx_command_t *cmd, void *con
 
 	ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock update command handler");
 
-	if ((s = ngx_http_hsock_set_op(cf, NGX_HTTP_HSOCK_UPDATE, conf)) != NGX_CONF_OK)
+	if ((s = ngx_http_hsock_set_act(cf, NGX_HTTP_HSOCK_UPDATE, conf)) != NGX_CONF_OK)
 		return s;
 
 	return ngx_http_hsock_set_columns(cf, conf);
@@ -785,7 +861,7 @@ static char* ngx_http_hsock_insert(ngx_conf_t *cf, ngx_command_t *cmd, void *con
 
 	ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock insert command handler");
 
-	if ((s = ngx_http_hsock_set_op(cf, NGX_HTTP_HSOCK_INSERT, conf)) != NGX_CONF_OK)
+	if ((s = ngx_http_hsock_set_act(cf, NGX_HTTP_HSOCK_INSERT, conf)) != NGX_CONF_OK)
 		return s;
 
 	return ngx_http_hsock_set_columns(cf, conf);
@@ -797,7 +873,7 @@ static char* ngx_http_hsock_delete(ngx_conf_t *cf, ngx_command_t *cmd, void *con
 
 	ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock delete command handler");
 
-	if ((s = ngx_http_hsock_set_op(cf, NGX_HTTP_HSOCK_DELETE, conf)) != NGX_CONF_OK)
+	if ((s = ngx_http_hsock_set_act(cf, NGX_HTTP_HSOCK_DELETE, conf)) != NGX_CONF_OK)
 		return s;
 
 	return NGX_CONF_OK;
