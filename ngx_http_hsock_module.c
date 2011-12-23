@@ -720,11 +720,16 @@ static ngx_int_t ngx_http_hsock_subrequest_done(ngx_http_request_t *r, void *dat
 		if (s == r->upstream->buffer.last || *s == '\n') {
 
 			if (s != st) {
-				val = ngx_array_push(&ctx->subreq_vars);
-				val->data = st;
-				val->len = s - st;
 
-				ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "http subrequest variable #%d='%*s'", n, val->len, val->data);
+				/* ignore first two fields */
+				if (n > 1) {
+					val = ngx_array_push(&ctx->subreq_vars);
+					val->data = st;
+					val->len = s - st;
+
+					ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "http subrequest variable #%d='%*s'", n, val->len, val->data);
+				}
+
 				++n;
 			}
 
