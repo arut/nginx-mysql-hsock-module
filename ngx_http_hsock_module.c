@@ -371,7 +371,6 @@ static ngx_int_t ngx_http_hsock_create_request(ngx_http_request_t *r)
 	ngx_http_hsock_loc_conf_t* hlcf;
 	ngx_buf_t *b;
 	ngx_chain_t *cl, **ll = &cl;
-	ngx_http_hsock_ctx_t *ctx;
 	ngx_http_upstream_t  *u;
 	ngx_str_t op, mop;
 	u_char lim[32];
@@ -394,8 +393,6 @@ static ngx_int_t ngx_http_hsock_create_request(ngx_http_request_t *r)
 					"hsock creating request");
 
 	hlcf = ngx_http_get_module_loc_conf(r, ngx_http_hsock_module);
-
-	ctx = ngx_http_get_module_ctx(r, ngx_http_hsock_module);
 
 	/* create first chain link & buffer */
 	cl = ngx_alloc_chain_link(r->pool);
@@ -583,7 +580,6 @@ static ngx_int_t ngx_http_hsock_filter(void *data, ssize_t bytes)
 	ssize_t n;
 	ngx_http_request_t *r = ctx->request;
 	ngx_chain_t *cl, **ll;
-	u_char* fstart;
 
 	ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
 			"hsock filter");
@@ -605,8 +601,6 @@ static ngx_int_t ngx_http_hsock_filter(void *data, ssize_t bytes)
 
 	cl->buf->pos = b->last;
 	cl->buf->tag = u->output.tag;
-
-	fstart = b->pos;
 
 	u->keepalive = 1;
 
