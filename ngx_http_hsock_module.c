@@ -1,33 +1,31 @@
-/****************************************************************************
-Copyright (c) 2011, Roman Arutyunyan (arut@qip.ru)
+/******************************************************************************
+Copyright (c) 2011-2012, Roman Arutyunyan (arut@qip.ru)
 All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    * Neither the name of the <organization> nor the
-      names of its contributors may be used to endorse or promote products
-      derived from this software without specific prior written permission.
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-   
-*****************************************************************************/
+   1. Redistributions of source code must retain the above copyright notice, 
+      this list of conditions and the following disclaimer.
+
+   2. Redistributions in binary form must reproduce the above copyright notice, 
+      this list of conditions and the following disclaimer in the documentation
+      and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR ''AS IS'' AND ANY EXPRESS OR IMPLIED
+WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT 
+SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, 
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR 
+BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING 
+IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY 
+OF SUCH DAMAGE.
+*******************************************************************************/
 
 /*
- True async NGINX upstream module for accessing MySQL via HandlerSocket protocol
+  True async NGINX upstream module for accessing MySQL via HandlerSocket protocol
 */
 
 #include <ngx_config.h>
@@ -389,7 +387,7 @@ static ngx_int_t ngx_http_hsock_create_request(ngx_http_request_t *r)
 
 	u->request_sent = 1;
 
-	ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+	ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
 					"hsock creating request");
 
 	hlcf = ngx_http_get_module_loc_conf(r, ngx_http_hsock_module);
@@ -487,7 +485,7 @@ static ngx_int_t ngx_http_hsock_reinit_request(ngx_http_request_t *r)
 
 	u = r->upstream;
 
-	ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+	ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
 			"hsock reinit request (%d)", u->peer.cached);
 
 	if (u->peer.cached)
@@ -535,7 +533,7 @@ static ngx_int_t ngx_http_hsock_process_header(ngx_http_request_t *r)
 	if (!ctx->open_index)
 		return NGX_OK;
 
-	ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+	ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
 			"hsock processing header");
 
 	pp = u->buffer.pos;
@@ -557,7 +555,7 @@ static ngx_int_t ngx_http_hsock_process_header(ngx_http_request_t *r)
 
 		for(errmsg = ++p; p != u->buffer.last && *p != '\t'; ++p);
 
-		ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+		ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
 				"hsock server returned error (%d): %*s", 
 				errcode, p - errmsg, errmsg);
 
@@ -581,7 +579,7 @@ static ngx_int_t ngx_http_hsock_filter(void *data, ssize_t bytes)
 	ngx_http_request_t *r = ctx->request;
 	ngx_chain_t *cl, **ll;
 
-	ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+	ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
 			"hsock filter");
 
 	u = r->upstream;
@@ -625,7 +623,7 @@ static ngx_int_t ngx_http_hsock_filter(void *data, ssize_t bytes)
 
 static void ngx_http_hsock_abort_request(ngx_http_request_t *r)
 {
-	ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+	ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
 			"hsock abort request");
 	return;
 }
@@ -633,7 +631,7 @@ static void ngx_http_hsock_abort_request(ngx_http_request_t *r)
 static void ngx_http_hsock_finalize_request(ngx_http_request_t *r,
 		    ngx_int_t rc)
 {
-	ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+	ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
 			"hsock finalize request");
 	return;
 }
@@ -697,15 +695,18 @@ static ngx_int_t ngx_http_hsock_handler(ngx_http_request_t *r)
 	return NGX_DONE;
 }
 
-static ngx_int_t ngx_http_hsock_subrequest_done(ngx_http_request_t *r, void *data, ngx_int_t rc)
+static ngx_int_t ngx_http_hsock_subrequest_done(ngx_http_request_t *r, 
+void *data, ngx_int_t rc)
 {
 	u_char *s, *st;
 	ngx_http_hsock_ctx_t *ctx = data;
 	ngx_str_t *val;
 	unsigned n = 0;
 
-	ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, 
-			"hsock subrequest done; '%*s'", r->upstream->buffer.last - r->upstream->buffer.pos, r->upstream->buffer.pos);
+	ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, 
+			"hsock subrequest done; '%*s'", 
+			r->upstream->buffer.last - r->upstream->buffer.pos, 
+			r->upstream->buffer.pos);
 
 	s = st = r->upstream->buffer.pos; 
 
@@ -721,7 +722,9 @@ static ngx_int_t ngx_http_hsock_subrequest_done(ngx_http_request_t *r, void *dat
 					val->data = st;
 					val->len = s - st;
 
-					ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "http subrequest variable #%d='%*s'", n, val->len, val->data);
+					ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, 
+							"http subrequest variable #%d='%*s'", 
+							n, val->len, val->data);
 				}
 
 				++n;
@@ -751,7 +754,8 @@ static ngx_int_t ngx_http_hsock_subrequest_handler(ngx_http_request_t *r)
 	if (!hlcf->uri.len)
 		return NGX_DECLINED;
 
-	ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "hsock subrequest handler");
+	ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, 
+			"hsock subrequest handler");
 
 	/* check context */
 	ctx = ngx_http_get_module_ctx(r, ngx_http_hsock_module);
@@ -797,7 +801,7 @@ static ngx_int_t ngx_http_hsock_post_conf(ngx_conf_t *cf)
 	ngx_http_core_main_conf_t  *cmcf;
 	ngx_http_handler_pt *h;
 
-	ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock post conf");
+	ngx_log_debug0(NGX_LOG_INFO, cf->log, 0, "hsock post conf");
 
 	/* set up handler */
 	cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
@@ -814,7 +818,8 @@ static ngx_int_t ngx_http_hsock_post_conf(ngx_conf_t *cf)
 
 static void* ngx_http_hsock_create_loc_conf(ngx_conf_t *cf)
 {
-	ngx_http_hsock_loc_conf_t *conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_hsock_loc_conf_t));
+	ngx_http_hsock_loc_conf_t *conf = ngx_pcalloc(cf->pool, 
+			sizeof(ngx_http_hsock_loc_conf_t));
 
 	conf->upstream.connect_timeout = NGX_CONF_UNSET_MSEC;
 	conf->upstream.send_timeout = NGX_CONF_UNSET_MSEC;
@@ -829,19 +834,23 @@ static void* ngx_http_hsock_create_loc_conf(ngx_conf_t *cf)
 	return conf;
 }
 
-static char* ngx_http_hsock_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
+static char* ngx_http_hsock_merge_loc_conf(ngx_conf_t *cf, 
+		void *parent, void *child)
 {
 	ngx_http_hsock_loc_conf_t *prev = parent;
 	ngx_http_hsock_loc_conf_t *conf = child;
 
 	ngx_conf_merge_msec_value(conf->upstream.connect_timeout,
-			prev->upstream.connect_timeout, NGX_HTTP_HSOCK_DEFAULT_CONNECT_TIMEOUT);
+			prev->upstream.connect_timeout, 
+			NGX_HTTP_HSOCK_DEFAULT_CONNECT_TIMEOUT);
 
 	ngx_conf_merge_msec_value(conf->upstream.send_timeout,
-			prev->upstream.send_timeout, NGX_HTTP_HSOCK_DEFAULT_SEND_TIMEOUT);
+			prev->upstream.send_timeout, 
+			NGX_HTTP_HSOCK_DEFAULT_SEND_TIMEOUT);
 
 	ngx_conf_merge_msec_value(conf->upstream.read_timeout,
-			prev->upstream.read_timeout, NGX_HTTP_HSOCK_DEFAULT_READ_TIMEOUT);
+			prev->upstream.read_timeout, 
+			NGX_HTTP_HSOCK_DEFAULT_READ_TIMEOUT);
 
 	ngx_conf_merge_size_value(conf->upstream.buffer_size,
 			prev->upstream.buffer_size,
@@ -896,7 +905,7 @@ static ngx_int_t ngx_http_hsock_subrequest_variable_getter(ngx_http_request_t *r
 	unsigned n = (unsigned)data;
 	ngx_str_t *vals;
 
-	ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, 
+	ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, 
 			"hsock subrequest accessing variable #%d", (int)data);
 
 	ctx = ngx_http_get_module_ctx(r, ngx_http_hsock_module);
@@ -914,21 +923,24 @@ static ngx_int_t ngx_http_hsock_subrequest_variable_getter(ngx_http_request_t *r
 	return NGX_OK;
 }
 
-static char* ngx_http_hsock_select(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+static char* ngx_http_hsock_select(ngx_conf_t *cf, 
+		ngx_command_t *cmd, void *conf)
 {
 	ngx_str_t *value = cf->args->elts;
 	ngx_http_hsock_loc_conf_t* hlcf = conf;
 	unsigned n;
 	char* s;
 
-	ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock select command handler");
+	ngx_log_debug0(NGX_LOG_INFO, cf->log, 0, "hsock select command handler");
 
-	if ((s = ngx_http_hsock_set_act(cf, NGX_HTTP_HSOCK_SELECT, conf)) != NGX_CONF_OK)
+	if ((s = ngx_http_hsock_set_act(cf, 
+					NGX_HTTP_HSOCK_SELECT, conf)) != NGX_CONF_OK)
 		return s;
 
 	/* init array */
 	if (!hlcf->columns.nalloc && cf->args->nelts > 1)
-		ngx_array_init(&hlcf->columns, cf->pool, cf->args->nelts - 1, sizeof(ngx_str_t));
+		ngx_array_init(&hlcf->columns, cf->pool, 
+				cf->args->nelts - 1, sizeof(ngx_str_t));
 
 	for(n = 1; n < cf->args->nelts; ++n) {
 
@@ -992,7 +1004,7 @@ static char* ngx_http_hsock_update(ngx_conf_t *cf, ngx_command_t *cmd, void *con
 {
 	char *s;
 
-	ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock update command handler");
+	ngx_log_debug0(NGX_LOG_INFO, cf->log, 0, "hsock update command handler");
 
 	if ((s = ngx_http_hsock_set_act(cf, NGX_HTTP_HSOCK_UPDATE, conf)) != NGX_CONF_OK)
 		return s;
@@ -1004,7 +1016,7 @@ static char* ngx_http_hsock_insert(ngx_conf_t *cf, ngx_command_t *cmd, void *con
 {
 	char *s;
 
-	ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock insert command handler");
+	ngx_log_debug0(NGX_LOG_INFO, cf->log, 0, "hsock insert command handler");
 
 	if ((s = ngx_http_hsock_set_act(cf, NGX_HTTP_HSOCK_INSERT, conf)) != NGX_CONF_OK)
 		return s;
@@ -1016,7 +1028,7 @@ static char* ngx_http_hsock_delete(ngx_conf_t *cf, ngx_command_t *cmd, void *con
 {
 	char *s;
 
-	ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock delete command handler");
+	ngx_log_debug0(NGX_LOG_INFO, cf->log, 0, "hsock delete command handler");
 
 	if ((s = ngx_http_hsock_set_act(cf, NGX_HTTP_HSOCK_DELETE, conf)) != NGX_CONF_OK)
 		return s;
@@ -1031,7 +1043,7 @@ static char* ngx_http_hsock_key(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 	unsigned n;
 	ngx_http_hsock_value_t *cvalue;
 
-	ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock where command handler");
+	ngx_log_debug0(NGX_LOG_INFO, cf->log, 0, "hsock where command handler");
 
 	if (!hlcf->where.nalloc && cf->args->nelts > 1) {
 		ngx_array_init(&hlcf->where, cf->pool, cf->args->nelts - 1, 
@@ -1092,14 +1104,14 @@ static char * ngx_http_hsock_subrequest(ngx_conf_t *cf, ngx_command_t *cmd, void
 	unsigned n;
 	ngx_http_variable_t *v;
 
-	ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock subrequest handler");
+	ngx_log_debug0(NGX_LOG_INFO, cf->log, 0, "hsock subrequest handler");
 
 	/* create input uri */
 	value = cf->args->elts;
 
 	hlcf->uri = value[1];
 
-	ngx_log_debug(NGX_LOG_INFO, cf->log, 0, "hsock subrequest uri: '%V'", &hlcf->uri);
+	ngx_log_debug1(NGX_LOG_INFO, cf->log, 0, "hsock subrequest uri: '%V'", &hlcf->uri);
 
 	for(n = 2; n < cf->args->nelts; ++n) {
 
