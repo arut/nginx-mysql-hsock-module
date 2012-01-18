@@ -90,7 +90,9 @@ struct ngx_http_hsock_loc_conf_s {
 
 	ngx_int_t offset;
 
-	ngx_str_t uri;       /* subrequest */
+	ngx_array_t *subreq_lengths; /* subrequest */
+	ngx_array_t *subreq_values;
+
 };
 
 typedef struct ngx_http_hsock_loc_conf_s ngx_http_hsock_loc_conf_t;
@@ -748,10 +750,13 @@ static ngx_int_t ngx_http_hsock_subrequest_handler(ngx_http_request_t *r)
 	ngx_http_request_t *sr;
 	ngx_http_post_subrequest_t *ps;
 	ngx_http_hsock_ctx_t *ctx;
+	u_char *q;
+	ngx_str_t uri;
+	ngx_str_t args = ngx_null_string;
 
 	hlcf = ngx_http_get_module_loc_conf(r, ngx_http_hsock_module);
 
-	if (!hlcf->uri.len)
+	if (!hlcf->subreq_lengths || !hlcf->subreq_values)
 		return NGX_DECLINED;
 
 	ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, 
@@ -776,10 +781,24 @@ static ngx_int_t ngx_http_hsock_subrequest_handler(ngx_http_request_t *r)
 
 	ps->handler = ngx_http_hsock_subrequest_done;
 	ps->data = ctx;
+	    
+	if (ngx_http_script_run(r, &uri, hlcf->subreq_lengths->elts, 0,
+				hlcf->subreq_values->elts) == NULL)
+	{
+		return NGX_ERROR;
+	}
+
+	q = ngx_strlchr(uri.data, uri.data + uri.len, '?');
+
+	if (q != NULL) {
+		args.data = q + 1;
+		args.len = uri.data + uri.len - q - 1;
+		uri.len = q - uri.data;
+	}
 
 	if (ngx_http_subrequest(r, 
-			&hlcf->uri, 
-			NULL,
+			&uri, 
+			&args,
 			&sr,
 			ps,
 			NGX_HTTP_SUBREQUEST_WAITED | NGX_HTTP_SUBREQUEST_IN_MEMORY) != NGX_OK)
@@ -787,10 +806,6 @@ static ngx_int_t ngx_http_hsock_subrequest_handler(ngx_http_request_t *r)
 
 	if (sr == NULL)
 		return NGX_ERROR;
-
-	/* copy request data from parent request */
-	sr->args = r->args;
-	sr->headers_in = r->headers_in;
 
 	return NGX_DONE;
 }
@@ -1101,17 +1116,34 @@ static char * ngx_http_hsock_subrequest(ngx_conf_t *cf, ngx_command_t *cmd, void
 {
 	ngx_http_hsock_loc_conf_t *hlcf = conf;
 	ngx_str_t *value;
-	unsigned n;
+	ngx_uint_t n;
 	ngx_http_variable_t *v;
+	ngx_http_script_compile_t sc;
+	ngx_str_t *uri;
 
 	ngx_log_debug0(NGX_LOG_INFO, cf->log, 0, "hsock subrequest handler");
 
 	/* create input uri */
 	value = cf->args->elts;
 
-	hlcf->uri = value[1];
+	uri = &value[1];
 
 	ngx_log_debug1(NGX_LOG_INFO, cf->log, 0, "hsock subrequest uri: '%V'", &hlcf->uri);
+
+	n = ngx_http_script_variables_count(uri);
+
+	ngx_memzero(&sc, sizeof(ngx_http_script_compile_t));
+
+	sc.cf = cf;
+	sc.source = uri;
+	sc.lengths = &hlcf->subreq_lengths;
+	sc.values = &hlcf->subreq_values;
+	sc.variables = n;
+	sc.complete_lengths = 1;
+	sc.complete_values = 1;
+
+	if (ngx_http_script_compile(&sc) != NGX_OK)
+		return NGX_CONF_ERROR;
 
 	for(n = 2; n < cf->args->nelts; ++n) {
 
