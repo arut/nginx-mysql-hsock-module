@@ -1128,7 +1128,7 @@ static char * ngx_http_hsock_subrequest(ngx_conf_t *cf, ngx_command_t *cmd, void
 
 	uri = &value[1];
 
-	ngx_log_debug1(NGX_LOG_INFO, cf->log, 0, "hsock subrequest uri: '%V'", &hlcf->uri);
+	ngx_log_debug1(NGX_LOG_INFO, cf->log, 0, "hsock subrequest uri: '%V'", uri);
 
 	n = ngx_http_script_variables_count(uri);
 
