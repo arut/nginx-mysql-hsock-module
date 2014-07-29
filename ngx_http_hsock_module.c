@@ -415,6 +415,7 @@ static ngx_int_t ngx_http_hsock_create_request(ngx_http_request_t *r)
 	}
 
 	slim.len = 0;
+        slim.data = 0;
 
 	if (hlcf->limit != NGX_CONF_UNSET
 			|| hlcf->offset != NGX_CONF_UNSET)
